@@ -42,8 +42,13 @@ def sanitize_value(val):
 
     return val
 
-def load_and_filter(table, filename, filter_fn, process_fn):
+def load_and_filter(table, filename, filter_fn, process_fn, no_sanitize_cols=None, exclude_cols=None):
     print(f"Loading {table} from {filename}")
+
+    if no_sanitize_cols is None:
+        no_sanitize_cols = set()
+    if exclude_cols is None:
+        exclude_cols = set()
 
     with open(filename, newline="") as f:
         reader = csv.DictReader(f)
@@ -53,15 +58,15 @@ def load_and_filter(table, filename, filter_fn, process_fn):
             if filter_fn(row):
                 process_fn(row)
 
-                # Convert "" to None (NULL in PostgreSQL)
-                cleaned = {k: (None if v == "" else v) for k, v in row.items()}
+                # Convert "" to None (NULL in PostgreSQL) and exclude specified columns
+                cleaned = {k: (None if v == "" else v) for k, v in row.items() if k not in exclude_cols}
                 rows.append(cleaned)
 
     if not rows:
         print(f"WARNING: No valid rows found for table {table}.")
         return
 
-    cols = rows[0].keys()
+    cols = list(rows[0].keys())
     col_list = ",".join(cols)
     values_template = ",".join(["%s"] * len(cols))
     insert_sql = f"INSERT INTO {table} ({col_list}) VALUES ({values_template})"
@@ -71,7 +76,11 @@ def load_and_filter(table, filename, filter_fn, process_fn):
 
     for row in rows:
         try:
-            cleaned_values = [sanitize_value(v) for v in row.values()]
+            # Sanitize values except for columns in no_sanitize_cols
+            cleaned_values = [
+                v if col in no_sanitize_cols else sanitize_value(v)
+                for col, v in zip(cols, row.values())
+            ]
             cur.execute(insert_sql, cleaned_values)
             inserted += 1
         except UniqueViolation:
@@ -85,7 +94,7 @@ def patients_filter(row):
     return True
 
 def patients_process(row):
-    valid_subject_ids.add(int(row["SUBJECT_ID"]))
+    valid_subject_ids.add(sanitize_value(row["SUBJECT_ID"]))
 
 load_and_filter(
     "patients",
@@ -95,10 +104,10 @@ load_and_filter(
 )
 
 def admissions_filter(row):
-    return int(row["SUBJECT_ID"]) in valid_subject_ids
+    return sanitize_value(row["SUBJECT_ID"]) in valid_subject_ids
 
 def admissions_process(row):
-    valid_hadm_ids.add(int(row["HADM_ID"]))
+    valid_hadm_ids.add(sanitize_value(row["HADM_ID"]))
 
 load_and_filter(
     "admissions",
@@ -109,12 +118,12 @@ load_and_filter(
 
 def icustays_filter(row):
     return (
-        int(row["SUBJECT_ID"]) in valid_subject_ids and
-        int(row["HADM_ID"]) in valid_hadm_ids
+        sanitize_value(row["SUBJECT_ID"]) in valid_subject_ids and
+        sanitize_value(row["HADM_ID"]) in valid_hadm_ids
     )
 
 def icustays_process(row):
-    valid_icustay_ids.add(int(row["ICUSTAY_ID"]))
+    valid_icustay_ids.add(sanitize_value(row["ICUSTAY_ID"]))
 
 load_and_filter(
     "icustays",
@@ -127,20 +136,26 @@ def d_icd_filter(row):
     return True
 
 def d_icd_process(row):
-    valid_icd9_codes.add(row["ICD9_CODE"])
+    # Keep ICD9_CODE as string - don't sanitize
+    icd9 = row["ICD9_CODE"]
+    valid_icd9_codes.add(None if icd9 == "" else icd9)
 
 load_and_filter(
     "d_icd_diagnoses",
     f"{MIMIC_PATH}/D_ICD_DIAGNOSES/D_ICD_DIAGNOSES.csv",
     d_icd_filter,
     d_icd_process,
+    no_sanitize_cols={"ICD9_CODE"},
 )
 
 def diagnoses_icd_filter(row):
+    # Keep ICD9_CODE as string - don't sanitize
+    icd9 = row["ICD9_CODE"]
+    icd9_normalized = None if icd9 == "" else icd9
     return (
-        int(row["SUBJECT_ID"]) in valid_subject_ids and
-        int(row["HADM_ID"]) in valid_hadm_ids and
-        row["ICD9_CODE"] in valid_icd_codes
+        sanitize_value(row["SUBJECT_ID"]) in valid_subject_ids and
+        sanitize_value(row["HADM_ID"]) in valid_hadm_ids and
+        icd9_normalized in valid_icd9_codes
     )
 
 def diagnoses_icd_process(row):
@@ -151,12 +166,13 @@ load_and_filter(
     f"{MIMIC_PATH}/DIAGNOSES_ICD/DIAGNOSES_ICD_sorted.csv",
     diagnoses_icd_filter,
     diagnoses_icd_process,
+    no_sanitize_cols={"ICD9_CODE"},
 )
 
 def noteevents_filter(row):
     return (
-        int(row["SUBJECT_ID"]) in valid_subject_ids and
-        int(row["HADM_ID"]) in valid_hadm_ids
+        sanitize_value(row["SUBJECT_ID"]) in valid_subject_ids and
+        sanitize_value(row["HADM_ID"]) in valid_hadm_ids
     )
 
 def noteevents_process(row):
@@ -167,6 +183,7 @@ load_and_filter(
     f"{MIMIC_PATH}/NOTEEVENTS/NOTEEVENTS_sorted.csv",
     noteevents_filter,
     noteevents_process,
+    exclude_cols={"CHARTTIME", "STORETIME"},
 )
 
 
