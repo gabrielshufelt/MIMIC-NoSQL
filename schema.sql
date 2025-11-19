@@ -1,54 +1,86 @@
+DROP TABLE IF EXISTS PATIENTS CASCADE;
+
 CREATE TABLE PATIENTS (
-    subject_id INTEGER PRIMARY KEY,
-    gender TEXT,
-    dob DATE,
-    dod DATE
+    ROW_ID          INT,
+    SUBJECT_ID      INT PRIMARY KEY,
+    GENDER          VARCHAR(5),
+    DOB             TIMESTAMP,
+    DOD             TIMESTAMP,
+    DOD_HOSP        TIMESTAMP,
+    DOD_SSN         TIMESTAMP,
+    EXPIRE_FLAG     INT
 );
+
+DROP TABLE IF EXISTS ADMISSIONS CASCADE;
 
 CREATE TABLE ADMISSIONS (
-    hadm_id INTEGER PRIMARY KEY,
-    subject_id INTEGER REFERENCES PATIENTS(subject_id),
-    admittime TIMESTAMP,
-    dischtime TIMESTAMP,
-    deathtime TIMESTAMP,
-    admission_type TEXT CHECK (admission_type IN ('emergency', 'elective', 'urgent', 'newborn')),
-    admission_location TEXT,
-    discharge_location TEXT,
-    insurance TEXT
+    ROW_ID               INT PRIMARY KEY,
+    SUBJECT_ID           INT REFERENCES PATIENTS(SUBJECT_ID),
+    HADM_ID              INT UNIQUE,
+    ADMITTIME            TIMESTAMP,
+    DISCHTIME            TIMESTAMP,
+    DEATHTIME            TIMESTAMP,
+    ADMISSION_TYPE       VARCHAR(50),
+    ADMISSION_LOCATION   VARCHAR(100),
+    DISCHARGE_LOCATION   VARCHAR(100),
+    INSURANCE            VARCHAR(50),
+    LANGUAGE             VARCHAR(10),
+    RELIGION             VARCHAR(50),
+    MARITAL_STATUS       VARCHAR(50),
+    ETHNICITY            VARCHAR(100),
+    EDREGTIME            TIMESTAMP,
+    EDOUTTIME            TIMESTAMP,
+    DIAGNOSIS            VARCHAR(255),
+    HOSPITAL_EXPIRE_FLAG INT,
+    HAS_CHARTEVENTS_DATA INT
 );
+
+DROP TABLE IF EXISTS ICUSTAYS CASCADE;
 
 CREATE TABLE ICUSTAYS (
-    icustay_id INTEGER PRIMARY KEY,
-    subject_id INTEGER REFERENCES PATIENTS(subject_id),
-    hadm_id INTEGER REFERENCES ADMISSIONS(hadm_id),
-    intime TIMESTAMP,
-    outtime TIMESTAMP,
-    source TEXT,
-    ward_id INTEGER,
-    first_careunit TEXT,
-    last_careunit TEXT
+    ROW_ID          INT PRIMARY KEY,
+    SUBJECT_ID      INT REFERENCES PATIENTS(SUBJECT_ID),
+    HADM_ID         INT REFERENCES ADMISSIONS(HADM_ID),
+    ICUSTAY_ID      INT UNIQUE,
+    DBSOURCE        VARCHAR(20),
+    FIRST_CAREUNIT  VARCHAR(20),
+    LAST_CAREUNIT   VARCHAR(20),
+    FIRST_WARDID    INT,
+    LAST_WARDID     INT,
+    INTIME          TIMESTAMP,
+    OUTTIME         TIMESTAMP,
+    LOS             NUMERIC
 );
 
+DROP TABLE IF EXISTS NOTEEVENTS CASCADE;
 
 CREATE TABLE NOTEEVENTS (
-    row_id INTEGER PRIMARY KEY,
-    subject_id INTEGER REFERENCES PATIENTS(subject_id),
-    hadm_id INTEGER REFERENCES ADMISSIONS(hadm_id),
-    charttime TIMESTAMP,
-    category TEXT CHECK (category IN ('discharge_summary', 'radiology_report', 'progress_note', 'other')),
-    description TEXT,
-    text TEXT
+    ROW_ID        INT PRIMARY KEY,
+    SUBJECT_ID    INT REFERENCES PATIENTS(SUBJECT_ID),
+    HADM_ID       INT REFERENCES ADMISSIONS(HADM_ID),
+    CHARTDATE     DATE,
+    CATEGORY      VARCHAR(50),
+    DESCRIPTION   VARCHAR(255),
+    CGID          INT,
+    ISERROR       VARCHAR(10),
+    TEXT          TEXT
 );
 
-CREATE TABLE D_ICD_DIAGNOSIS (
-    icd_code TEXT PRIMARY KEY,
-    short_title TEXT,
-    long_title TEXT
+DROP TABLE IF EXISTS D_ICD_DIAGNOSES CASCADE;
+
+CREATE TABLE D_ICD_DIAGNOSES (
+    ROW_ID      INT PRIMARY KEY,
+    ICD9_CODE   VARCHAR(10) UNIQUE,
+    SHORT_TITLE VARCHAR(255),
+    LONG_TITLE  VARCHAR(255)
 );
 
-CREATE TABLE DIAGNOSIS_ICD (
-    row_id INTEGER PRIMARY KEY,
-    subject_id INTEGER REFERENCES PATIENTS(subject_id),
-    hadm_id INTEGER REFERENCES ADMISSIONS(hadm_id),
-    icd_code TEXT REFERENCES D_ICD_DIAGNOSIS(icd_code)
+DROP TABLE IF EXISTS DIAGNOSES_ICD CASCADE;
+
+CREATE TABLE DIAGNOSES_ICD (
+    ROW_ID      INT PRIMARY KEY,
+    SUBJECT_ID  INT REFERENCES PATIENTS(SUBJECT_ID),
+    HADM_ID     INT REFERENCES ADMISSIONS(HADM_ID),
+    SEQ_NUM     INT,
+    ICD9_CODE   VARCHAR(10) REFERENCES D_ICD_DIAGNOSES(ICD9_CODE)
 );
