@@ -1,27 +1,35 @@
 import os
-import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 MIMIC_PATH = os.path.expanduser("~/Downloads/mimic-iii")
 
 # create connection to 'mimic' db
 engine = create_engine("postgresql://postgres:postgres@localhost/mimic")
 
-tables = ["PATIENTS", "ADMISSIONS", "ICUSTAYS", "NOTEEVENTS", "D_ICD_DIAGNOSES", "DIAGNOSES_ICD"]
+table_files = {
+    "PATIENTS": "PATIENTS/PATIENTS_sorted.csv",
+    "ADMISSIONS": "ADMISSIONS/ADMISSIONS_sorted.csv",
+    "ICUSTAYS": "ICUSTAYS/ICUSTAYS_sorted.csv",
+    "D_ICD_DIAGNOSES": "D_ICD_DIAGNOSES/D_ICD_DIAGNOSES.csv",
+    "DIAGNOSES_ICD": "DIAGNOSES_ICD/DIAGNOSES_ICD_sorted.csv",
+    "NOTEEVENTS": "NOTEEVENTS/NOTEEVENTS_sorted.csv"
+}
 
-for folder in tables:
-    folder_path = os.path.join(MIMIC_PATH, folder)
-    if not os.path.isdir(folder_path):
+for table, rel_path in table_files.items():
+    path = os.path.join(MIMIC_PATH, rel_path)
+    if not os.path.exists(path):
+        print(f"Missing file for {table}: {path}")
         continue
 
-    csv_files = [f for f in os.listdir(folder_path) if (f.endswith("_random.csv") or f.endswith(".csv"))]
-    if not csv_files:
-        continue
+    print(f"Loading {table} from: {path}")
 
-    csv_path = os.path.join(folder_path, csv_files[0])
-    print(f"Loading {csv_path} → table {folder}")
+    # COPY FROM is extremely fast
+    with engine.connect() as conn:
+        conn.execute(text(f"TRUNCATE {table} CASCADE;"))
+        copy_sql = f"COPY {table} FROM STDIN WITH CSV HEADER;"
 
-    df = pd.read_csv(csv_path, low_memory=False)
-    df.to_sql(folder, engine, if_exists="append", index=False)
+        raw = conn.connection
+        with raw.cursor() as cur, open(path, "r") as f:
+            cur.copy_expert(copy_sql, f)
 
 print("Done!")
