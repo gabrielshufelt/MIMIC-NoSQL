@@ -64,13 +64,12 @@ for table in tables:
             # Convert Decimal values to float for MongoDB compatibility
             value_doc = convert_decimal(value_doc)
 
-            # OPTIONAL: build a "value string" with all non-PK attributes
+            # Build a "value string" with all non-PK attributes
             value_string = " | ".join(f"{k}={v}" for k, v in value_doc.items())
 
             doc = {
                 "_id": pk_value,
-                "data": value_doc,
-                "value_string": value_string  # remove this if you don't want it
+                "value_string": value_string
             }
 
             batch.append(doc)
