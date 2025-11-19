@@ -1,5 +1,20 @@
 from sqlalchemy import create_engine, inspect, text
 from pymongo import MongoClient
+from decimal import Decimal
+from datetime import date, datetime
+
+def convert_decimal(obj):
+    """Recursively convert Decimal and date objects for MongoDB compatibility."""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, date) and not isinstance(obj, datetime):
+        # Convert date to datetime (MongoDB doesn't support date objects)
+        return datetime.combine(obj, datetime.min.time())
+    elif isinstance(obj, dict):
+        return {k: convert_decimal(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_decimal(item) for item in obj]
+    return obj
 
 engine = create_engine("postgresql://postgres:postgres@localhost/mimic")
 inspector = inspect(engine)
@@ -27,8 +42,10 @@ for table in tables:
 
     pk = primary_keys[0]  # Assume single-column PK
 
-    # Create Mongo collection
+    # Create Mongo collection and drop existing data
     collection = mongo_db[table]
+    collection.drop()  # Clear existing data to avoid duplicates
+    print(f"Dropped existing collection: {table}")
 
     # Query all rows from table
     with engine.connect() as conn:
@@ -43,6 +60,9 @@ for table in tables:
 
             # Build document without the PK
             value_doc = {k: v for k, v in row.items() if k != pk}
+
+            # Convert Decimal values to float for MongoDB compatibility
+            value_doc = convert_decimal(value_doc)
 
             # OPTIONAL: build a "value string" with all non-PK attributes
             value_string = " | ".join(f"{k}={v}" for k, v in value_doc.items())
@@ -64,4 +84,4 @@ for table in tables:
         if batch:
             collection.insert_many(batch, ordered=False)
 
-    print(f"✔ Inserted documents for {table}")
+    print(f"[OK] Inserted documents for {table}")
