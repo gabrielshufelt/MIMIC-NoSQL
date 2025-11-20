@@ -102,11 +102,29 @@ python populate_db.py
 ```
 
 ## Phase 2 - Migrating to a NoSQL DB
-1. Install MongoDB.
+### 1. Install MongoDB Community Server.
+
+**For MacOS:**
 ```
 brew tap mongodb/brew
 brew install mongodb-community
 brew services start mongodb-community
 ```
-You can also download it from https://www.mongodb.com/try/download/community.
-2.  
+
+**For Windows**, you can download it from https://www.mongodb.com/try/download/community. After installation, make sure the MongoDB service is running:
+![img.png](img.png)
+
+### 2. Download and install MongoDB Shell
+
+**For MacOS:**
+```
+brew tap mongodb/brew
+brew install mongosh
+```
+
+**For Windows**, download it from https://www.mongodb.com/try/download/shell. Extract the zip, and add it 'C:\Users\<your user>\Downloads\mongosh-2.5.9-win32-x64\mongosh-2.5.9-win32-x64\bin' to your _PATH_ system environment variable.
+
+### 3. Run the migration script
+```
+python migrate_db.py
+```
