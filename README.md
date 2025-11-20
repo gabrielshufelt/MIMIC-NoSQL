@@ -36,7 +36,7 @@ curl -L -o ~/Downloads/mimic-iii-10k.zip\
 ```
 Alternatively, download the dataset as zip from https://www.kaggle.com/datasets/bilal1907/mimic-iii-10k.
 
-Once downloaded, make sure to unpack the zip file and rename the root folder to 'mimic-iii'.
+Once downloaded, make sure to unpack the zip file.
 
 2. Install last version of postgresql with homebrew.
 ```
@@ -64,13 +64,15 @@ createdb mimic
 psql -U postgres mimic < schema.sql
 ```
 
-7. Populate the database
+7. Go to `populate_db.py` line 6, and change *MIMIC_PATH* to point to the dataset folder you downloaded in step 1.
+
+8. Populate the database
 ```
 python3 populate_db.py
 ```
 
 ### Manual Setup (Windows)
-1. Download the MIMIC-III dataset as zip from https://www.kaggle.com/datasets/bilal1907/mimic-iii-10k. Once downloaded, make sure to unpack the zip file and rename the root folder to 'mimic-iii'.
+1. Download the MIMIC-III dataset as zip from https://www.kaggle.com/api/v1/datasets/download/bilal1907/mimic-iii-10k. Once downloaded, make sure to unpack the zip file.
 
 2. Download the PostgreSQL installer for Windows from https://www.postgresql.org/download/.
 
@@ -128,3 +130,78 @@ brew install mongosh
 ```
 python migrate_db.py
 ```
+
+## Using the NoSQL Database
+We are using MongoDB as our NoSQL key-value database. To start exploring the data, try the following commands:
+
+### 1. Connect to the database via the MongoDB shell
+```
+mongosh
+use mimic_nosql
+```
+
+### 2. Basic Database Operations
+
+**View all collections:**
+```
+show collections
+```
+
+**Count documents in a collection:**
+```
+db.patients.countDocuments()
+db.admissions.countDocuments()
+```
+
+### 3. Querying Data
+
+**Find a specific patient by ID:**
+```
+db.patients.findOne({_id: 10006})
+```
+
+**Find all female patients:**
+```
+db.patients.find({value_string: /gender=F/})
+```
+
+**Find patients who have died:**
+```
+db.patients.find({value_string: /expire_flag=1/})
+```
+
+**Find admissions by patient ID:**
+```
+db.admissions.find({value_string: /subject_id=10006/})
+```
+
+**Find ICU stays with length of stay greater than 5 days:**
+```
+db.icustays.find({value_string: /LOS=[6-9]|LOS=[1-9][0-9]/})
+```
+
+**Search clinical notes by keyword:**
+```
+db.noteevents.find({value_string: /pneumonia/i})
+```
+
+**Find diagnosis codes and their descriptions:**
+```
+db.d_icd_diagnoses.findOne({_id: 1})
+```
+
+**List all diagnoses for a specific patient:**
+```
+db.diagnoses_icd.find({value_string: /subject_id=10006/})
+```
+
+### 4. Advanced Queries
+
+**Limit and sort results:**
+```
+db.patients.find().limit(10)
+db.admissions.find().sort({_id: -1}).limit(5)
+```
+
+## TODO
+1. Compare query performance, for example the time it takes retrieving a record by its id, relational vs. NoSQL.
